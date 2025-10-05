@@ -1,36 +1,72 @@
-import { Alchemy, Network } from 'alchemy-sdk';
-import { useEffect, useState } from 'react';
+import { Alchemy, Network } from "alchemy-sdk";
+import { useEffect, useState } from "react";
+import "./App.css";
 
-import './App.css';
-
-// Refer to the README doc for more information about using API
-// keys in client-side code. You should never do this in production
-// level code.
 const settings = {
-  apiKey: process.env.REACT_APP_ALCHEMY_API_KEY,
+  apiKey: process.env.REACT_APP_ALCHEMY_API_KEY, // Make sure this is set in .env
   network: Network.ETH_MAINNET,
 };
 
-
-// In this week's lessons we used ethers.js. Here we are using the
-// Alchemy SDK is an umbrella library with several different packages.
-//
-// You can read more about the packages here:
-//   https://docs.alchemy.com/reference/alchemy-sdk-api-surface-overview#api-surface
 const alchemy = new Alchemy(settings);
 
 function App() {
-  const [blockNumber, setBlockNumber] = useState();
+  const [blockNumber, setBlockNumber] = useState(null);
+  const [blockData, setBlockData] = useState(null);
+  const [blockReceipt, setBlockReceipt] = useState(null);
 
   useEffect(() => {
-    async function getBlockNumber() {
-      setBlockNumber(await alchemy.core.getBlockNumber());
+    async function getBlockData() {
+      try {
+        // 1️⃣ Get the latest block number
+        const latestBlockNumber = await alchemy.core.getBlockNumber();
+        setBlockNumber(latestBlockNumber);
+
+        // 2️⃣ Get full block details with transactions
+        const block = await alchemy.core.getBlockWithTransactions(latestBlockNumber);
+        setBlockData(block);
+
+        // 3️⃣ Get the first transaction’s receipt (if it exists)
+        if (block.transactions.length > 0) {
+          const firstTxHash = block.transactions[0].hash;
+          const receipt = await alchemy.core.getTransactionReceipt(firstTxHash);
+          setBlockReceipt(receipt);
+        } else {
+          setBlockReceipt("No transactions in this block");
+        }
+      } catch (error) {
+        console.error("Error fetching block data:", error);
+      }
     }
 
-    getBlockNumber();
-  });
+    getBlockData();
+  }, []);
 
-  return <div className="App">Block Number: {blockNumber}</div>;
+  return (
+    <div className="App" style={{ fontFamily: "monospace", padding: "1rem" }}>
+      <h2>Latest Ethereum Block Info</h2>
+
+      <section>
+        <strong>Block Number:</strong> {blockNumber ?? "Loading..."}
+      </section>
+
+      {blockData && (
+        <pre style={{ textAlign: "left", marginTop: "1rem" }}>
+          {JSON.stringify(blockData, null, 2)}
+        </pre>
+      )}
+
+      {blockReceipt && (
+        <section style={{ marginTop: "1rem" }}>
+          <strong>First Transaction Receipt:</strong>
+          <pre style={{ textAlign: "left" }}>
+            {typeof blockReceipt === "string"
+              ? blockReceipt
+              : JSON.stringify(blockReceipt, null, 2)}
+          </pre>
+        </section>
+      )}
+    </div>
+  );
 }
 
 export default App;
